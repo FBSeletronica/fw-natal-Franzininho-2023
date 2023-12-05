@@ -64,7 +64,94 @@ void Delay_Ms(uint32_t n);
 
 //Global variables
 uint32_t leds = 0x01;
-uint16_t time = 0;
+uint64_t time = 0;
+
+// Frequências para notas musicais (em Hz)
+#define NOTE_C4 168
+#define NOTE_D4 150
+#define NOTE_E4 133
+#define NOTE_F4 126
+#define NOTE_G4 112
+#define NOTE_A4 100
+#define NOTE_B4 89
+#define NOTE_C5 84
+#define NOTE_D5 75
+#define NOTE_E5 67
+#define NOTE_F5 63
+#define NOTE_G5 56
+#define NOTE_REST 0
+
+// Durações das notas (em milissegundos)
+#define DURATION_QUARTER 250
+#define DURATION_EIGHTH 125
+#define DURATION_HALF 500
+#define DURATION_WHOLE 1000
+
+/* PWM Output Mode Definition */
+#define PWM_MODE1   0
+#define PWM_MODE2   1
+
+/* PWM Output Mode Selection */
+//#define PWM_MODE PWM_MODE1
+#define PWM_MODE PWM_MODE1
+
+// Matriz com as notas musicais e suas durações
+const int melodyDuration[][2] = {
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_G4, DURATION_QUARTER}, {NOTE_C4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER},
+  {NOTE_F4, DURATION_HALF}, {NOTE_F4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
+  {NOTE_E4, DURATION_HALF}, {NOTE_D4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
+  {NOTE_D4, DURATION_HALF}, {NOTE_G4, DURATION_HALF},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_G4, DURATION_QUARTER}, {NOTE_C4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER},
+  {NOTE_E4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER},
+  {NOTE_F4, DURATION_HALF}, {NOTE_F4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
+  {NOTE_E4, DURATION_HALF}, {NOTE_D4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
+  {NOTE_D4, DURATION_HALF}, {NOTE_G4, DURATION_HALF}
+};
+
+
+// Função para inicializar o PWM
+void TIM1_PWMOut_Init(u16 arr, u16 psc, u16 ccp)
+{
+    GPIO_InitTypeDef GPIO_InitStructure={0};
+    TIM_OCInitTypeDef TIM_OCInitStructure={0};
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure={0};
+
+    RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOD, ENABLE );
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIO_Init( GPIOD, &GPIO_InitStructure );
+
+    RCC_APB2PeriphClockCmd( RCC_APB2Periph_TIM1, ENABLE );
+    TIM_TimeBaseInitStructure.TIM_Period = arr;
+    TIM_TimeBaseInitStructure.TIM_Prescaler = psc;
+    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInit( TIM1, &TIM_TimeBaseInitStructure);
+
+#if (PWM_MODE == PWM_MODE1)
+  TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+
+#elif (PWM_MODE == PWM_MODE2)
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
+
+#endif
+
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OCInitStructure.TIM_Pulse = ccp;
+    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+    TIM_OC1Init( TIM1, &TIM_OCInitStructure );
+
+    TIM_CtrlPWMOutputs(TIM1, ENABLE );
+    TIM_OC1PreloadConfig( TIM1, TIM_OCPreload_Disable );
+    TIM_ARRPreloadConfig( TIM1, ENABLE );
+    TIM_Cmd( TIM1, ENABLE );
+}
 
 // Function to invert the bits of a byte
 unsigned char invertBits(unsigned char byte) 
@@ -288,7 +375,12 @@ int main(void)
     NVIC_EnableIRQ(TIM2_IRQn);
     TIM_Cmd(TIM2,ENABLE);
 
-	uint8_t animation = 1;	//animation number
+
+	
+	uint8_t animation = 1;		//animation number
+	uint8_t x = 0;				//melody note
+	uint8_t x_ant = -1;			//melody note ant
+	uint8_t play_melody = 0;	//play melody
 
 	while (1)
 	{
@@ -310,6 +402,21 @@ int main(void)
 		//delay 20 ms
 		Delay_Ms(1);
 		time++;
+
+		//play melody
+		if(play_melody)
+		{
+			if(x != x_ant)
+			{
+			x_ant = x;
+			TIM_SetAutoreload(TIM1, melodyDuration[x][0]);
+			}
+			if(time % melodyDuration[x][1] == 0) 
+			{
+				x++;				
+				if(x == 48) x = 0;
+			}	
+		}
 
 		switch (animation)
 			{
@@ -348,6 +455,24 @@ int main(void)
 		if(time % 5000 == 0)
 		{
 			animation ++;
+		}
+
+		if(time % 60000 == 0)								//toca a melodia a cada 1 minuto
+		{
+			play_melody = !play_melody;
+			if(play_melody)									//se play_melody = 1
+			{
+				//init TIM1 PWM
+				TIM1_PWMOut_Init( NOTE_E4, 1090-1, 50);		//inicia o TIM1 para PWM
+				x = 0;				
+				x_ant = -1;			
+
+			}
+			else
+			{
+				TIM_Cmd(TIM1,DISABLE);
+			}
+
 		}
 	}
 }
