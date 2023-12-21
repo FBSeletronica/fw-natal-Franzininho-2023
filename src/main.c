@@ -51,10 +51,6 @@
 #define BUTTON_PIN GPIO_Pin_0
 #define BUTTON_CLOCK_ENABLE RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE)
 
-//buzzer
-#define BUZZER_PORT GPIOD
-#define BUZZER_PIN GPIO_Pin_2
-#define BUZZER_CLOCK_ENABLE RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE)
 
 //Functions prototypes
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -65,93 +61,6 @@ void Delay_Ms(uint32_t n);
 //Global variables
 uint32_t leds = 0x01;
 uint64_t time = 0;
-
-// Frequências para notas musicais (em Hz)
-#define NOTE_C4 168
-#define NOTE_D4 150
-#define NOTE_E4 133
-#define NOTE_F4 126
-#define NOTE_G4 112
-#define NOTE_A4 100
-#define NOTE_B4 89
-#define NOTE_C5 84
-#define NOTE_D5 75
-#define NOTE_E5 67
-#define NOTE_F5 63
-#define NOTE_G5 56
-#define NOTE_REST 0
-
-// Durações das notas (em milissegundos)
-#define DURATION_QUARTER 250
-#define DURATION_EIGHTH 125
-#define DURATION_HALF 500
-#define DURATION_WHOLE 1000
-
-/* PWM Output Mode Definition */
-#define PWM_MODE1   0
-#define PWM_MODE2   1
-
-/* PWM Output Mode Selection */
-//#define PWM_MODE PWM_MODE1
-#define PWM_MODE PWM_MODE1
-
-// Matriz com as notas musicais e suas durações
-const int melodyDuration[][2] = {
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_G4, DURATION_QUARTER}, {NOTE_C4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER},
-  {NOTE_F4, DURATION_HALF}, {NOTE_F4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
-  {NOTE_E4, DURATION_HALF}, {NOTE_D4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
-  {NOTE_D4, DURATION_HALF}, {NOTE_G4, DURATION_HALF},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_HALF},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_G4, DURATION_QUARTER}, {NOTE_C4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER},
-  {NOTE_E4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER}, {NOTE_F4, DURATION_QUARTER},
-  {NOTE_F4, DURATION_HALF}, {NOTE_F4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
-  {NOTE_E4, DURATION_HALF}, {NOTE_D4, DURATION_QUARTER}, {NOTE_D4, DURATION_QUARTER}, {NOTE_E4, DURATION_QUARTER},
-  {NOTE_D4, DURATION_HALF}, {NOTE_G4, DURATION_HALF}
-};
-
-
-// Função para inicializar o PWM
-void TIM1_PWMOut_Init(u16 arr, u16 psc, u16 ccp)
-{
-    GPIO_InitTypeDef GPIO_InitStructure={0};
-    TIM_OCInitTypeDef TIM_OCInitStructure={0};
-    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure={0};
-
-    RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOD, ENABLE );
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
-    GPIO_Init( GPIOD, &GPIO_InitStructure );
-
-    RCC_APB2PeriphClockCmd( RCC_APB2Periph_TIM1, ENABLE );
-    TIM_TimeBaseInitStructure.TIM_Period = arr;
-    TIM_TimeBaseInitStructure.TIM_Prescaler = psc;
-    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit( TIM1, &TIM_TimeBaseInitStructure);
-
-#if (PWM_MODE == PWM_MODE1)
-  TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
-
-#elif (PWM_MODE == PWM_MODE2)
-    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
-
-#endif
-
-    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = ccp;
-    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
-    TIM_OC1Init( TIM1, &TIM_OCInitStructure );
-
-    TIM_CtrlPWMOutputs(TIM1, ENABLE );
-    TIM_OC1PreloadConfig( TIM1, TIM_OCPreload_Disable );
-    TIM_ARRPreloadConfig( TIM1, ENABLE );
-    TIM_Cmd( TIM1, ENABLE );
-}
 
 // Function to invert the bits of a byte
 unsigned char invertBits(unsigned char byte) 
@@ -312,7 +221,7 @@ void TIM2_IRQHandler(void){									// ISR for TIM2
     if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {	// if TIM2 update interrupt flag is set
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update);			// clear TIM2 update interrupt flag
 
-        leds_write(leds);									//update leds
+		leds_write(leds);									//update leds
     }
 }
 
@@ -337,7 +246,8 @@ int main(void)
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(T_PORT, &GPIO_InitStructure);
-/* 
+
+	/* 
 	//init button
 	BUTTON_CLOCK_ENABLE;
 	GPIO_InitStructure.GPIO_Pin = BUTTON_PIN;
@@ -345,52 +255,25 @@ int main(void)
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(BUTTON_PORT, &GPIO_InitStructure);
 
-	//init buzzer
-	BUZZER_CLOCK_ENABLE;
-	GPIO_InitStructure.GPIO_Pin = BUZZER_PIN;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(BUZZER_PORT, &GPIO_InitStructure);
-
 	*/
 
 	//turn off all transistors
 	GPIO_ResetBits(T_PORT, ALL_T);
-
-
-	//init timer
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure = {0};
-
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-
-    TIM_TimeBaseInitStructure.TIM_Period = 5000;
-    TIM_TimeBaseInitStructure.TIM_Prescaler = 48-1;
-    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
-    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);
-    TIM_ARRPreloadConfig(TIM2, ENABLE);
-    TIM_ITConfig(TIM2,TIM_IT_Update,ENABLE);
-    NVIC_SetPriority(TIM2_IRQn, 0x80);
-    NVIC_EnableIRQ(TIM2_IRQn);
-    TIM_Cmd(TIM2,ENABLE);
-
-
 	
 	uint8_t animation = 1;		//animation number
-	uint8_t x = 0;				//melody note
-	uint8_t x_ant = -1;			//melody note ant
-	uint8_t play_melody = 0;	//play melody
 
 	while (1)
 	{
 
-		// //read button with debounce
+		// // //read button with debounce
 		// uint8_t button_state = 0;
-		// for (uint8_t i = 0; i < 10; i++)
+		// if(GPIO_ReadInputDataBit(BUTTON_PORT, BUTTON_PIN) == 0)
 		// {
-		// 	button_state += GPIO_ReadInputDataBit(BUTTON_PORT, BUTTON_PIN);
-		// 	Delay_Ms(1);
+		// 	button_state++;
+		// }
+		// else
+		// {
+		// 	button_state = 0;
 		// }
 
 		// //if button pressed
@@ -402,21 +285,6 @@ int main(void)
 		//delay 20 ms
 		Delay_Ms(1);
 		time++;
-
-		//play melody
-		if(play_melody)
-		{
-			if(x != x_ant)
-			{
-			x_ant = x;
-			TIM_SetAutoreload(TIM1, melodyDuration[x][0]);
-			}
-			if(time % melodyDuration[x][1] == 0) 
-			{
-				x++;				
-				if(x == 48) x = 0;
-			}	
-		}
 
 		switch (animation)
 			{
@@ -452,27 +320,9 @@ int main(void)
 			}
 
 
-		if(time % 5000 == 0)
+		if(time % 60000 == 0)		//change animation every 1 minute
 		{
 			animation ++;
-		}
-
-		if(time % 60000 == 0)								//toca a melodia a cada 1 minuto
-		{
-			play_melody = !play_melody;
-			if(play_melody)									//se play_melody = 1
-			{
-				//init TIM1 PWM
-				TIM1_PWMOut_Init( NOTE_E4, 1090-1, 50);		//inicia o TIM1 para PWM
-				x = 0;				
-				x_ant = -1;			
-
-			}
-			else
-			{
-				TIM_Cmd(TIM1,DISABLE);
-			}
-
 		}
 	}
 }
