@@ -62,6 +62,7 @@ void Delay_Ms(uint32_t n);
 uint32_t leds = 0x01;
 uint64_t time = 0;
 
+
 // Function to invert the bits of a byte
 unsigned char invertBits(unsigned char byte) 
 {
@@ -259,6 +260,22 @@ int main(void)
 
 	//turn off all transistors
 	GPIO_ResetBits(T_PORT, ALL_T);
+
+
+	//init timer
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure = {0};
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+    TIM_TimeBaseInitStructure.TIM_Period = 830;
+    TIM_TimeBaseInitStructure.TIM_Prescaler = 48-1;
+    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);
+    TIM_ARRPreloadConfig(TIM2, ENABLE);
+    TIM_ITConfig(TIM2,TIM_IT_Update,ENABLE);
+    NVIC_SetPriority(TIM2_IRQn, 0x80);
+    NVIC_EnableIRQ(TIM2_IRQn);
+    TIM_Cmd(TIM2,ENABLE);
 	
 	uint8_t animation = 1;		//animation number
 
@@ -289,11 +306,11 @@ int main(void)
 		switch (animation)
 			{
 				case 1:
-				if(time % 20 == 0) animation_1();
+				if(time % 100 == 0) animation_1();
 				break;
 
 				case 2:
-				if(time % 20 == 0) animation_2();
+				if(time % 100 == 0) animation_2();
 				break;
 
 				case 3:
@@ -320,7 +337,7 @@ int main(void)
 			}
 
 
-		if(time % 60000 == 0)		//change animation every 1 minute
+		if(time % 60000 == 0)
 		{
 			animation ++;
 		}
