@@ -2,7 +2,7 @@
 * Christmas Ball - Franzininho
 * 
 * This code is part of Christmas Ball project for 2023 Christmas Projects by
-* Franziinho Community.
+* Franzininho Community.
 *
 * Microcontroller: CH32V003F4P6
 * Framework: None SDK for CH32
@@ -58,13 +58,15 @@
 //Functions prototypes
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void EXTI7_0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void TIM2_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+
 void Delay_Init(void);
 void Delay_Ms(uint32_t n);
 
 //Global variables
 uint32_t leds = 0x01;
 uint64_t time = 0;
-
 
 // Function to invert the bits of a byte
 unsigned char invertBits(unsigned char byte) 
@@ -132,7 +134,6 @@ void animation_1(void)
 	if (leds == 0x80000000)
 	{
 		leds = 0x00000001;
-
 	}
 }
 
@@ -159,7 +160,6 @@ void animation_3(void)
 		invert = 0;
 		leds = 0x55555555;
 	}
-
 }
 
 void animation_4(void)
@@ -221,17 +221,6 @@ void animation_6(void)
 			direction = 0;
 		}
 	}
-}
-
-
-// ISR for TIM2
-__attribute__((interrupt("WCH-Interrupt-fast")))			// ISR in RAM
-void TIM2_IRQHandler(void){									// ISR for TIM2
-    if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {	// if TIM2 update interrupt flag is set
-        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);			// clear TIM2 update interrupt flag
-
-		leds_write(leds);									//update leds
-    }
 }
 
 
@@ -478,7 +467,15 @@ void HardFault_Handler(void)
 	}
 }
 
-void EXTI7_0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+// ISR for TIM2
+void TIM2_IRQHandler(void){									// ISR for TIM2
+    if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {	// if TIM2 update interrupt flag is set
+        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);			// clear TIM2 update interrupt flag
+
+		leds_write(leds);									//update leds
+    }
+}
+
 
 /*********************************************************************
  * @fn      EXTI0_IRQHandler
