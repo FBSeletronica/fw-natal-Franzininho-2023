@@ -91,32 +91,36 @@ void leds_write(uint32_t leds)
 		case 0:										//LEDS GROUP1
 		group++;									//increment group
 		GPIO_ResetBits(T_PORT, T4_PIN);				//turn off T4	
-		GPIO_SetBits(T_PORT, T1_PIN);				//turn on T1
 		GPIO_Write(LEDS_PORT, leds & 0x000000FF); 	//LED GROUP1 Write
+		GPIO_SetBits(T_PORT, T1_PIN);				//turn on T1
 		break;
 
 		case 1:										//LEDS GROUP2							
 		group++;									//increment group
 		GPIO_ResetBits(T_PORT, T1_PIN);				//turn off T1
-		GPIO_SetBits(T_PORT, T2_PIN);				//turn on T2
 		GPIO_Write(LEDS_PORT, leds>>8);				//LED GROUP2 Write
+		GPIO_SetBits(T_PORT, T2_PIN);				//turn on T2
 		break;
 
 		case 2:											//LEDS GROUP3
 		group++;										//increment group
 		GPIO_ResetBits(T_PORT, T2_PIN);					//turn off T2
-		GPIO_SetBits(T_PORT, T3_PIN);				  	//turn on T3			
 		GPIO_Write(LEDS_PORT, invertBits(leds>>15)); 	//LED GROUP3 Write - invertBits because 
-													 	//the leds are in the opposite direction
+														//the leds are in the opposite direction
 														//in the PCB
+		GPIO_SetBits(T_PORT, T3_PIN);				  	//turn on T3			
+		
+													 	
 		break;
 
 		case 3:											//LEDS GROUP4
 		GPIO_ResetBits(T_PORT, T3_PIN);					//turn off T3
-		GPIO_SetBits(T_PORT, T4_PIN);					//turn on T4
 		GPIO_Write(LEDS_PORT, invertBits(leds>>23));	//LED GROUP4 Write - invertBits because 
 														//the leds are in the opposite direction
 														//in the PCB
+		GPIO_SetBits(T_PORT, T4_PIN);					//turn on T4
+		
+														
 		group = 0;										//reset group
 		break;
 	}
@@ -186,12 +190,12 @@ void animation_5(void)
 		break;
 
 		case 1:
-		leds = 0b10010010010010010010010010010010;
+		leds = 0b00100100100100100010010010010010;
 		RGB++;
 		break;
 
 		case 2:
-		leds = 0b00100100100100100100100100100100;
+		leds = 0b10010010010010010100100100100100;
 		RGB = 0;
 		break;
 	}
@@ -455,6 +459,7 @@ int main(void)
 			init_gpio();
 			animation++;
 		}
+		
 	}
 }
 
