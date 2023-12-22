@@ -62,6 +62,7 @@ void Delay_Ms(uint32_t n);
 uint32_t leds = 0x01;
 uint64_t time = 0;
 
+volatile uint8_t button_flag = 0; 
 
 // Function to invert the bits of a byte
 unsigned char invertBits(unsigned char byte) 
@@ -125,6 +126,7 @@ void animation_1(void)
 	if (leds == 0x80000000)
 	{
 		leds = 0x00000001;
+
 	}
 }
 
@@ -248,15 +250,36 @@ int main(void)
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(T_PORT, &GPIO_InitStructure);
 
-	/* 
-	//init button
-	BUTTON_CLOCK_ENABLE;
-	GPIO_InitStructure.GPIO_Pin = BUTTON_PIN;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(BUTTON_PORT, &GPIO_InitStructure);
 
-	*/
+	// Set button pin as input
+	BUTTON_CLOCK_ENABLE;
+    GPIO_InitStructure.GPIO_Pin  = BUTTON_PIN;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(BUTTON_PORT, &GPIO_InitStructure);
+
+/*
+	// Set external interrupt
+	EXTI_InitTypeDef EXTI_InitStructure = {0};
+    
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource0);
+    EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
+
+    // Set interrupt controller
+	NVIC_InitTypeDef NVIC_InitStructure = {0};
+    NVIC_InitStructure.NVIC_IRQChannel = EXTI7_0_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    EXTI_ClearITPendingBit(EXTI_Line0);
+*/
+	
 
 	//turn off all transistors
 	GPIO_ResetBits(T_PORT, ALL_T);
@@ -279,68 +302,83 @@ int main(void)
 	
 	uint8_t animation = 1;		//animation number
 
+	uint8_t button_state = 1;  //variable to store button state
+	uint16_t button_pressed = 0; //variable to store button pressed time
+
 	while (1)
 	{
-
-		// // //read button with debounce
-		// uint8_t button_state = 0;
-		// if(GPIO_ReadInputDataBit(BUTTON_PORT, BUTTON_PIN) == 0)
-		// {
-		// 	button_state++;
-		// }
-		// else
-		// {
-		// 	button_state = 0;
-		// }
-
-		// //if button pressed
-		// if (button_state > 5)
-		// {
-			
-		// }
-
-		//delay 20 ms
 		Delay_Ms(1);
 		time++;
 
-		switch (animation)
-			{
-				case 1:
-				if(time % 100 == 0) animation_1();
-				break;
+		int new_state = GPIO_ReadInputDataBit(BUTTON_PORT, BUTTON_PIN);		//read button state
 
-				case 2:
-				if(time % 100 == 0) animation_2();
-				break;
-
-				case 3:
-				if(time % 100 == 0)animation_3();
-				break;
-
-				case 4:
-				if(time % 100 == 0 ) animation_4();
-				break;
-
-				case 5:
-				if(time % 1000 == 0) animation_5();
-				break;
-				
-				case 6:
-				if(time % 10 == 0) animation_6();
-				break;
-
-				default:
-				animation = 1;
-				break;
-
-
-			}
-
-
-		if(time % 60000 == 0)
+		if(new_state != button_state)				//if button state changed
+        {
+			button_state = new_state; 				//update button state
+            if (button_state == 0)                  //if button is pressed
+            {
+				button_pressed = 0;					//reset button pressed time
+            }
+            else                                    //if button is not pressed
+            {
+				if(button_pressed <5000)			//if button pressed time is less than 5 seconds
+				{
+					animation++;						//change animation
+					if(animation > 6) animation = 1;	//if animation is bigger than 6, reset animation
+				}
+            }
+        }
+		else										//if button state not changed
 		{
-			animation ++;
+			if (new_state == 0)                  	//if button is pressed
+			{
+				button_pressed++;					//increment button pressed time
+				if(button_pressed > 5000)			//if button pressed time is bigger than 5 seconds
+				{
+					
+					button_pressed=0;				//reset button pressed time
+
+				}
+			}
 		}
+
+		//animations
+		switch (animation)
+		{
+			case 1:
+			if(time % 100 == 0) animation_1();		//4,24 mA
+			break;
+
+			case 2:
+			if(time % 100 == 0) animation_2();		//4,24 mA	
+			break;
+
+			case 3:
+			if(time % 100 == 0)animation_3();		//6,57 mA
+			break;
+
+			case 4:
+			if(time % 100 == 0 ) animation_4();		//6,57 mA
+			break;
+
+			case 5:
+			if(time % 1000 == 0) animation_5();		//5,76 mA
+			break;
+			
+			case 6:
+			if(time % 10 == 0) animation_6();		//4,24 mA
+			break;
+
+			default:
+			animation = 1;
+			break;
+		}
+
+
+		// if(time % 60000 == 0)
+		// {
+		// 	animation ++;
+		// }
 	}
 }
 
