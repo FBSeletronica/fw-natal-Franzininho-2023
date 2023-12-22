@@ -356,6 +356,7 @@ int main(void)
             if (button_state == 0)                  //if button is pressed
             {
 				button_pressed = 0;					//reset button pressed time
+				time = 0;							//reset time count
             }
             else                                    //if button is not pressed
             {
@@ -447,6 +448,11 @@ int main(void)
 
 			init_gpio();
 			animation++;
+		}
+
+		if(time>= 3600000)
+		{
+			enter_standBy_mode();
 		}
 		
 	}
