@@ -24,6 +24,9 @@
 #include <ch32v00x.h>
 #include <debug.h>
 
+
+#define TIME_BT_ENTER_STANDBY 2500
+
 //LEDs
 #define LEDS_PORT GPIOC
 #define LED1_PIN GPIO_Pin_0
@@ -62,7 +65,6 @@ void Delay_Ms(uint32_t n);
 uint32_t leds = 0x01;
 uint64_t time = 0;
 
-volatile uint8_t button_flag = 0; 
 
 // Function to invert the bits of a byte
 unsigned char invertBits(unsigned char byte) 
@@ -228,13 +230,16 @@ void TIM2_IRQHandler(void){									// ISR for TIM2
     }
 }
 
-int main(void)
+
+void init_system(void)
 {
-	// Init System
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 	SystemCoreClockUpdate();
 	Delay_Init();
+}
 
+void init_gpio()
+{
 	// Init LEDS
 	LEDS_CLOCK_ENABLE;
 	GPIO_InitTypeDef GPIO_InitStructure;
@@ -257,34 +262,24 @@ int main(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(BUTTON_PORT, &GPIO_InitStructure);
+}
 
-/*
-	// Set external interrupt
-	EXTI_InitTypeDef EXTI_InitStructure = {0};
-    
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource0);
-    EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
+void deinit_gpio(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure = {0};
 
-    // Set interrupt controller
-	NVIC_InitTypeDef NVIC_InitStructure = {0};
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI7_0_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
 
-    EXTI_ClearITPendingBit(EXTI_Line0);
-*/
-	
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+    GPIO_Init(GPIOD, &GPIO_InitStructure);
+}
 
-	//turn off all transistors
-	GPIO_ResetBits(T_PORT, ALL_T);
-
-
+void init_timer_update_leds(void)
+{
 	//init timer
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure = {0};
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
@@ -299,9 +294,59 @@ int main(void)
     NVIC_SetPriority(TIM2_IRQn, 0x80);
     NVIC_EnableIRQ(TIM2_IRQn);
     TIM_Cmd(TIM2,ENABLE);
+}
+
+void init_ext_int(void)
+{
+	GPIO_InitTypeDef GPIO_InitStructure = {0};
+	EXTI_InitTypeDef EXTI_InitStructure = {0};
+	NVIC_InitTypeDef NVIC_InitStructure = {0};
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOD, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource0);
+	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+}
+
+void IWDG_Feed_Init(u16 prer, u16 rlr)
+{
+    IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);
+    IWDG_SetPrescaler(prer);
+    IWDG_SetReload(rlr);
+    IWDG_ReloadCounter();
+    IWDG_Enable();
+}
+
+void enter_standBy_mode(void)
+{
+	deinit_gpio(); 
+	init_ext_int();
+    RCC_LSICmd(ENABLE);
+    while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
+    PWR_EnterSTANDBYMode(PWR_STANDBYEntry_WFI);
+	IWDG_Feed_Init( IWDG_Prescaler_128, 500 );  //reset
+}
+
+int main(void)
+{
+	// Init System
+	init_system();
+	init_gpio();
+	
+	//turn off all transistors
+	GPIO_ResetBits(T_PORT, ALL_T);
+	init_timer_update_leds();
 	
 	uint8_t animation = 1;		//animation number
-
 	uint8_t button_state = 1;  //variable to store button state
 	uint16_t button_pressed = 0; //variable to store button pressed time
 
@@ -321,7 +366,7 @@ int main(void)
             }
             else                                    //if button is not pressed
             {
-				if(button_pressed <5000)			//if button pressed time is less than 5 seconds
+				if(button_pressed <TIME_BT_ENTER_STANDBY)			//if button pressed time is less than 5 seconds
 				{
 					animation++;						//change animation
 					if(animation > 6) animation = 1;	//if animation is bigger than 6, reset animation
@@ -333,11 +378,11 @@ int main(void)
 			if (new_state == 0)                  	//if button is pressed
 			{
 				button_pressed++;					//increment button pressed time
-				if(button_pressed > 5000)			//if button pressed time is bigger than 5 seconds
+				if(button_pressed > TIME_BT_ENTER_STANDBY)			//if button pressed time is bigger than 5 seconds
 				{
-					
-					button_pressed=0;				//reset button pressed time
-
+					leds = 0x00;
+					Delay_Ms(500);
+					enter_standBy_mode();
 				}
 			}
 		}
@@ -375,17 +420,73 @@ int main(void)
 		}
 
 
-		// if(time % 60000 == 0)
-		// {
-		// 	animation ++;
-		// }
+		if(time % 30000 == 0)
+		{
+
+			GPIO_InitTypeDef GPIO_InitStructure = {0};
+
+			EXTI_InitTypeDef EXTI_InitStructure = {0};
+
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+
+			EXTI_InitStructure.EXTI_Line = EXTI_Line9;
+			EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Event;
+			EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+			EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+			EXTI_Init(&EXTI_InitStructure);
+
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
+			RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;
+			GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			GPIO_Init(GPIOC, &GPIO_InitStructure);
+			GPIO_Init(GPIOD, &GPIO_InitStructure);
+			
+
+			RCC_LSICmd(ENABLE);
+			while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
+			PWR_AWU_SetPrescaler(PWR_AWU_Prescaler_10240);
+			PWR_AWU_SetWindowValue(25);
+			PWR_AutoWakeUpCmd(ENABLE);
+			PWR_EnterSTANDBYMode(PWR_STANDBYEntry_WFE);
+
+			init_gpio();
+			animation++;
+		}
 	}
 }
 
-void NMI_Handler(void) {}
+
+//Interrupts
+
+void NMI_Handler(void) 
+{
+
+
+}
 void HardFault_Handler(void)
 {
 	while (1)
 	{
 	}
+}
+
+void EXTI7_0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+
+/*********************************************************************
+ * @fn      EXTI0_IRQHandler
+ *
+ * @brief   This function handles EXTI0 Handler.
+ *
+ * @return  none
+ */
+void EXTI7_0_IRQHandler(void)
+{
+    if(EXTI_GetITStatus(EXTI_Line0)!=RESET)
+    {
+        printf("EXTI0 Wake_up\r\n");
+        EXTI_ClearITPendingBit(EXTI_Line0);     /* Clear Flag */
+    }
 }
